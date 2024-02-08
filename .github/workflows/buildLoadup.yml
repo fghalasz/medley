@@ -99,7 +99,7 @@ jobs:
     steps:
       # Checkout the actions for this repo owner
       - name: Checkout Actions
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/.github
           path: ./Actions_${{ github.sha }}
@@ -141,7 +141,7 @@ jobs:
     steps:
       # Checkout the actions for this repo owner
       - name: Checkout Actions
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/.github
           path: ./Actions_${{ github.sha }}
@@ -149,7 +149,7 @@ jobs:
 
       # Checkout latest commit
       - name: Checkout Medley
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Setup release tag
       - name: Setup Release Tag
@@ -219,7 +219,7 @@ jobs:
 
       # Checkout Notecards and tar it in the tarballsdir
       - name: Checkout Notecards
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/notecards
           path: ./notecards
@@ -269,7 +269,7 @@ jobs:
 
       # Save the tarball directory for subsequent jobs
       - name: Save tarballs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tarballs
           path: ${{ env.TARBALL_DIR }}
@@ -294,7 +294,7 @@ jobs:
 
       # Checkout latest commit
       - name: Checkout Medley
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Environment variables
       - name: Environment variables
@@ -311,7 +311,7 @@ jobs:
 
       #  Get the tarballs
       - name: Get tarballs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tarballs
           path: ${{ env.TARBALL_DIR }}
@@ -345,7 +345,7 @@ jobs:
             mv  medley-full-linux-x86_64-*.tgz medley.tgz
 
       - name: Save medley tar for use in cygwin installers
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: medley-tar
           path: |
@@ -375,7 +375,7 @@ jobs:
 
       # Checkout latest commit
       - name: Checkout Medley
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Environment variables
       - name: Environment variables
@@ -392,7 +392,7 @@ jobs:
 
       #  Get the tarballs
       - name: Get tarballs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tarballs
           path: ${{ env.TARBALL_DIR }}
@@ -444,7 +444,7 @@ jobs:
 
       # Checkout latest commit
       - name: Checkout Medley
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Store the values output from loadup job as environment variables
       - name: Environment Variables
@@ -463,7 +463,7 @@ jobs:
 
       # Retrieve medley tars from artifact store
       - name: Retrieve medley tar
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: medley-tar
           path: installers/cygwin/
@@ -556,7 +556,7 @@ jobs:
 
       # Checkout latest commit
       - name: Checkout Medley
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
 
       # Upload a dummy file to release
@@ -649,7 +649,7 @@ jobs:
 
       # Checkout the actions for this repo owner
       - name: Checkout Actions
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/.github
           path: ./Actions_${{ github.sha }}
