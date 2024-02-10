@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ###############################################################################
 #
 #    em_build.sh - script to package the Medley file system into a series of
@@ -26,7 +26,7 @@ get_script_dir() {
 
     local SCRIPT_PATH="$( get_abs_filename "$1" )";
 
-    pushd . > '/dev/null';
+    CWD="$( pwd )"
 
     while [ -h "$SCRIPT_PATH" ];
     do
@@ -37,24 +37,43 @@ get_script_dir() {
     cd "$( dirname -- "$SCRIPT_PATH"; )" > '/dev/null';
     SCRIPT_PATH="$( pwd; )";
 
-    popd  > '/dev/null';
+    cd "${CWD}"
 
     # set +x
 
     echo "${SCRIPT_PATH}"
 }
 
-SCRIPTDIR=$(get_script_dir "${BASH_SOURCE[0]:-$0}")
+#
+#  Check for emscriptem and find em tools directory
+#
+if [ -z "$(which em-config)" ]
+then
+  echo "Error: Cannot find em-config.  This means that either Emscripten is not installed"
+  echo "or .../emsdk/upstream/emscriptem has not been added to PATH."
+  echo "Exiting. Please remedy and retry."
+  exit 10
+fi
+EM_TOOLSDIR="$(em-config EMSCRIPTEN_ROOT)/tools"
 
 #
+#  Find where this script is executing from
+#
+SCRIPTDIR=$(get_script_dir "$0")
+
+#
+#  Create the subdirs (build and tar) where the output of this script are placed
 #
 mkdir -p "${SCRIPTDIR}"/build
+mkdir -p "${SCRIPTDIR}"/tar
 #
+#  Establish where Medley is
 #
 cd "${SCRIPTDIR}"
 cd ../..
 export MEDLEYDIR="$(pwd)"
 #
+#  Establish where Maiko is
 #
 cd "${MEDLEYDIR}"
 if [ -d "../maiko" ]
@@ -81,6 +100,7 @@ then
   exit 12
 fi
 #
+#  Establish where Notecards is.  If can't find, set NOAPPS flag.
 #
 cd "${MEDLEYDIR}"
 if [ -d "../notecards" ]
@@ -97,72 +117,157 @@ else
   NOAPPS="true"
 fi
 #
+#   Separate the sources, lcoms and tedit files
+#
+copy_lcoms () {
+  mkdir -p $1
+  find . -type d -exec mkdir -p $1/{} \;
+  find . ! -iname '*~*~' \( -iname '*.lcom' -o -iname '*.dfasl' \) -exec cp -p {} $1/{} \;
+}
+
+copy_sources () {
+  mkdir -p $1
+  find . -type d -exec mkdir -p $1/{} \;
+  find . ! -iname '*~*~' ! -iname '*.lcom' ! -iname '*.dfasl' ! -type d -exec cp -p {} $1/{} \;
+}
+
+TMP_DIR=/tmp/tmp-$$
+
+#
+# for medleyfs
+#
+MEDLEYFS_LCOMS=${TMP_DIR}/lcoms/medleyfs
+MEDLEYFS_SOURCES=${TMP_DIR}/sources/medleyfs
+MEDLEYFS_DIRS="greetfiles internal sources library lispusers"
+mkdir -p ${MEDLEYFS_LCOMS}
+mkdir -p ${MEDLEYFS_SOURCES}
+for dir in ${MEDLEYFS_DIRS}
+do
+  cd "${MEDLEYDIR}"/${dir}
+  copy_lcoms ${MEDLEYFS_LCOMS}/${dir}
+  copy_sources ${MEDLEYFS_SOURCES}/${dir}
+done
+#
+# for apps fs
+#
+if [ -z "${NOAPPS}" ]
+then
+    APPSFS_LCOMS=${TMP_DIR}/lcoms/appsfs
+    APPSFS_SOURCES=${TMP_DIR}/sources/appsfs
+    mkdir -p ${APPSFS_LCOMS}
+    mkdir -p ${APPSFS_SOURCES}
+    cd "${MEDLEYDIR}"/rooms
+    copy_lcoms ${APPSFS_LCOMS}/rooms
+    copy_sources ${APPSFS_SOURCES}/rooms
+    cd ${NCDIR}
+    copy_lcoms ${APPSFS_LCOMS}/notecards
+    copy_sources ${APPSFS_SOURCES}/notecards
+    mv ${APPSFS_SOURCES}/notecards/notefiles ${APPSFS_LCOMS}/notecards
+fi
+#
+#  Package the files
 #
 cd "${SCRIPTDIR}"
-file_packager									\
-    build/medleyfs.data 							\
-    --js-output=build/medleyfs.js 						\
+${EM_TOOLSDIR}/file_packager							\
+    build/medleyfs_lcoms.data 							\
+    --js-output=build/medleyfs_lcoms.js 					\
+    --preload 									\
+	"${MEDLEYDIR}"/fonts/@medley/fonts					\
+	"${MEDLEYDIR}"/unicode/@medley/unicode					\
+	"${MEDLEYDIR}"/doctools/@medley/doctools 				\
+	"${MEDLEYDIR}"/docs/@medley/docs 					\
+	"${MEDLEYFS_LCOMS}"@medley						\
+    --no-node									\
     --no-force 									\
+    --lz4 									\
     --use-preload-cache 							\
     --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
-    --preload 									\
-        "${MEDLEYDIR}"/loadups/whereis.hash@medley/loadups/whereis.hash 		\
-	"${MEDLEYDIR}"/greetfiles/MEDLEYDIR-INIT.LCOM@usr/local/lde/site-init.lisp\
-	"${MEDLEYDIR}"/docs/@medley/docs 						\
-	"${MEDLEYDIR}"/doctools/@medley/doctools 					\
-	"${MEDLEYDIR}"/greetfiles/@medley/greetfiles 				\
-	"${MEDLEYDIR}"/internal/@medley/internal 					\
-	"${MEDLEYDIR}"/sources/@medley/sources 					\
-	"${MEDLEYDIR}"/library/@medley/library 					\
-	"${MEDLEYDIR}"/lispusers/@medley/lispusers				\
-	"${MEDLEYDIR}"/fonts/@medley/fonts					\
-    2>&1 | grep -v FORCE_FILESYSTEM
+    2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
 
-file_packager									\
+${EM_TOOLSDIR}/file_packager							\
+    build/medleyfs_sources.data 						\
+    --js-output=build/medleyfs_sources.js 					\
+    --preload 									\
+        "${MEDLEYDIR}"/loadups/whereis.hash@medley/loadups/whereis.hash 	\
+	"${MEDLEYFS_SOURCES}"@medley						\
+    --no-node									\
+    --no-force 									\
+    --lz4 									\
+    --use-preload-cache 							\
+    --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
+    2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
+
+${EM_TOOLSDIR}/file_packager							\
     build/lisp_sysout.data 							\
     --js-output=build/lisp_sysout.js 						\
-    --no-force 									\
-    --use-preload-cache 							\
-    --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
     --preload 									\
         "${MEDLEYDIR}"/loadups/lisp.sysout@medley/loadups/lisp.sysout 		\
-    2>&1 | grep -v FORCE_FILESYSTEM
-
-file_packager									\
-    build/full_sysout.data 							\
-    --js-output=build/full_sysout.js 						\
+	"${MEDLEYDIR}"/greetfiles/MEDLEYDIR-INIT.LCOM@usr/local/lde/site-init.lisp\
+    --no-node									\
     --no-force 									\
+    --lz4 									\
     --use-preload-cache 							\
     --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
+    2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
+
+${EM_TOOLSDIR}/file_packager							\
+    build/full_sysout.data 							\
+    --js-output=build/full_sysout.js 						\
     --preload 									\
         "${MEDLEYDIR}"/loadups/full.sysout@medley/loadups/full.sysout 		\
-    2>&1 | grep -v FORCE_FILESYSTEM
+	"${MEDLEYDIR}"/greetfiles/MEDLEYDIR-INIT.LCOM@usr/local/lde/site-init.lisp\
+    --no-node									\
+    --no-force 									\
+    --lz4 									\
+    --use-preload-cache 							\
+    --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
+    2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
 
 if [ -z "${NOAPPS}" ]
 then
-  file_packager									\
+  ${EM_TOOLSDIR}/file_packager							\
       build/apps_sysout.data 							\
       --js-output=build/apps_sysout.js 						\
-      --no-force 								\
+      --preload 								\
+          "${MEDLEYDIR}"/loadups/apps.sysout@medley/loadups/apps.sysout 	\
+	  "${MEDLEYDIR}"/greetfiles/APPS-INIT.LCOM@usr/local/lde/site-init.lisp	\
+          "${MEDLEYDIR}"/greetfiles/MEDLEYDIR-INIT.LCOM@usr/local/lde/MEDLEYDIR-INIT.LCOM\
+      --no-node									\
+      --no-force								\
+      --lz4 									\
       --use-preload-cache 							\
       --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
-      --preload 								\
-          "${MEDLEYDIR}"/loadups/apps.sysout@medley/loadups/apps.sysout 		\
-      2>&1 | grep -v FORCE_FILESYSTEM
+      2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
 
-  file_packager									\
-      build/appsfs.data 							\
-      --js-output=build/appsfs.js						\
-      --no-force 								\
+  ${EM_TOOLSDIR}/file_packager							\
+      build/appsfs_lcoms.data 							\
+      --js-output=build/appsfs_lcoms.js						\
+      --preload 								\
+          "${APPSFS_LCOMS}"/rooms@medley/rooms			 		\
+          "${APPSFS_LCOMS}"/notecards@notecards					\
+      --no-node									\
+      --no-force								\
+      --lz4 									\
       --use-preload-cache 							\
       --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
+      2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
+
+  ${EM_TOOLSDIR}/file_packager							\
+      build/appsfs_sources.data							\
+      --js-output=build/appsfs_sources.js					\
       --preload 								\
-          "${MEDLEYDIR}"/rooms@medley/rooms			 		\
-          "${NCDIR}"@notecards							\
-      2>&1 | grep -v FORCE_FILESYSTEM
+          "${APPSFS_SOURCES}"/rooms@medley/rooms		 		\
+          "${APPSFS_SOURCES}"/notecards@notecards				\
+      --no-node									\
+      --no-force								\
+      --lz4 									\
+      --use-preload-cache 							\
+      --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
+      2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
+
 fi
 #
-#
+#   Add medley.html to the build subdirs
 #
 cd "${SCRIPTDIR}"
 cp -p medley.html build
@@ -171,19 +276,17 @@ then
   sed -i -e 's/params.has("apps")/false/' build/medley.html
 fi
 #
-#
+#  Add Maiko to the build subdirs
 #
 cd "${SCRIPTDIR}"
 cp -p "${MAIKODIR}"/emscripten.wasm_nl/* build
 #
+#  Create a tar of the build directory's contents
 #
-#
-mkdir -p "${SCRIPTDIR}"/tar
 cd "${SCRIPTDIR}"/build
 tar -c -z -f "${SCRIPTDIR}"/tar/medley-full-emscripten.tgz *
 #
-#
+#  Done
 #
 echo "Done with Medley emscripten build"
 exit 0
-

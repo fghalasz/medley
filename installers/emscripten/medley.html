@@ -13,30 +13,34 @@
     <script type="text/javascript">
          var Module;
          (function() {
-            let prerun = "";
             const width = 32*Math.trunc(Math.min(Math.max(window.innerWidth, 512), 1664)/32);
             const height = Math.min(Math.max(window.innerHeight, 512), 1260);
-            const search = window.location.search;
-            const params = new URLSearchParams(search);
+            const params = new URLSearchParams(window.location.search);
+
             let sysout = "full";
             if (params.has("lisp")) sysout = "lisp";
             if (params.has("full")) sysout = "full";
             if (params.has("apps")) sysout = "apps";
+
+            let include_sources = false;
+            if (params.has("source") || params.has("sources")) include_sources=true;
+
+            document.write('<script src="medleyfs_lcoms.js"><\/script>');
+            if (include_sources) document.write('<script src="medleyfs_sources.js"><\/script>');
+         
             document.write('<script src="' + sysout + '_sysout.js"><\/script>');
             if (sysout == "apps") { 
-              document.write('<script src="appsfs.js"><\/script>');
-              prerun = [function() {ENV.MEDLEYDIR = "{DSK}<medley>"; ENV.LDEINIT="/medley/greetfiles/APPS-INIT.LCOM"}];
+              document.write('<script src="appsfs_lcoms.js"><\/script>');
+              if (include_sources) document.write('<script src="appsfs_sources.js"><\/script>');
             }
-            else prerun =  [ function() {ENV.MEDLEYDIR = "{DSK}<medley>"; }];
             Module = 
 		{
-                  preRun: prerun,
+                  preRun: [ function() {ENV.MEDLEYDIR = "{DSK}<medley>"; }],
                   arguments: ["medley/loadups/"+sysout+".sysout","-sc", width+"x"+height, "-nh-host", "127.0.0.1"],
                   canvas: (function() { return document.getElementById('canvas'); })()
                 };
           })();
     </script>
-    <script src="medleyfs.js"></script>
     <script src="ldesdl.js"></script>
   </body>
 </html>
