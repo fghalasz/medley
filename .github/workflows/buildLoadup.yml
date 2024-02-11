@@ -239,7 +239,7 @@ jobs:
           Xvnc -geometry 1280x720 :0 &
           export DISPLAY=":0"
           scripts/loadup-all.sh -apps
-          scripts/loadup-db.sh
+      #    scripts/loadup-db.sh
 
       - name: Build release tars
         run: |
@@ -330,9 +330,10 @@ jobs:
       - name: Untar tarballs
         run: |
           cd ${IL_DIR}
+          mkdir -p maiko/emscripten.wasm_nl
           tar -x -z -f *-loadups.tgz
           tar -x -z -f *-runtime.tgz
-          tar -x -z -C maiko/emacripten.wasm_nl -f maiko*emscripten.tgz
+          tar -x -z -C maiko/emscripten.wasm_nl -f maiko*emscripten.tgz
           tar -x -z -f notecards.tgz
 
       # Build the emscripten files
