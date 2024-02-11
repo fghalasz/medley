@@ -339,7 +339,7 @@ jobs:
       # Build the emscripten files
       - name: Build emscripten files
         run: |
-          cd ${IL_DIR}/medley/installers/emcripten
+          cd ${IL_DIR}/medley/installers/emscripten
           ./em_build.sh
           cd tar
           mv medley-full-emscripten.tgz medley-full-emscripten-${COMBINED_RELEASE_TAG}.tgz
