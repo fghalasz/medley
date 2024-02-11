@@ -301,8 +301,23 @@ jobs:
           echo "MEDLEY_RELEASE_TAG=${{ needs.loadup.outputs.medley_release_tag }}" >>${GITHUB_ENV}
           echo "COMBINED_RELEASE_TAG=${{ needs.loadup.outputs.combined_release_tag }}" >>${GITHUB_ENV}
 
+      # Install Emscripten SDK
+      - name: Install Empscripten
+        working-directory: ../
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install latest
+          ./emsdk activate latest
+          CWD="$(pwd)"
+          echo "${CWD}"  >> ${GITHUB_PATH}
+          echo "${CWD}/upstream/emscripten" >> ${GITHUB_PATH}
+          echo "${CWD}/upstream/emscripten/tools" >> ${GITHUB_PATH}
+          echo "${CWD}/node/$(ls -d node/*64bit | tail -1)/bin" >> ${GITHUB_PATH}
+
       # Create working directory
-      - run: mkdir -p ${IL_DIR}
+      - name: Create working directory
+        run: mkdir -p ${IL_DIR}
 
       #  Get the tarballs
       - name: Get tarballs
@@ -313,7 +328,7 @@ jobs:
 
       #  Untar the tarballs
       - name: Untar tarballs
-      - run: |
+        run: |
           cd ${IL_DIR}
           tar -x -z -f *-loadups.tgz
           tar -x -z -f *-runtime.tgz
@@ -322,7 +337,7 @@ jobs:
 
       # Build the emscripten files
       - name: Build emscripten files
-      - run: |
+        run: |
           cd ${IL_DIR}/medley/installers/emcripten
           ./em_build.sh
           cd tar
