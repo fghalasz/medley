@@ -11,7 +11,11 @@
       <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     </div>
     <script type="text/javascript">
+
+         window.addEventListener("load",function() { document.body.style.backgroundColor = '#2D7D9A'; });
+
          var Module;
+
          (function() {
             const width = 32*Math.trunc(Math.min(Math.max(window.innerWidth, 512), 1664)/32);
             const height = Math.min(Math.max(window.innerHeight, 512), 1260);
@@ -26,11 +30,13 @@
             if (params.has("source") || params.has("sources")) include_sources=true;
 
             document.write('<script src="medleyfs_lcoms.js"><\/script>');
+            document.write('<script src="medleyfs_docs.js"><\/script>');
             if (include_sources) document.write('<script src="medleyfs_sources.js"><\/script>');
          
             document.write('<script src="' + sysout + '_sysout.js"><\/script>');
             if (sysout == "apps") { 
               document.write('<script src="appsfs_lcoms.js"><\/script>');
+              document.write('<script src="appsfs_docs.js"><\/script>');
               if (include_sources) document.write('<script src="appsfs_sources.js"><\/script>');
             }
             Module = 

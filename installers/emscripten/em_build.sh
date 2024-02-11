@@ -122,13 +122,47 @@ fi
 copy_lcoms () {
   mkdir -p $1
   find . -type d -exec mkdir -p $1/{} \;
-  find . ! -iname '*~*~' \( -iname '*.lcom' -o -iname '*.dfasl' \) -exec cp -p {} $1/{} \;
+  find .			\
+      \(			\
+        -iname '*.lcom' 	\
+        -o			\
+	-iname '*.dfasl'	\
+      \)			\
+      -exec cp -p {} $1/{} \;	\
+  ;
+}
+
+copy_docs () {
+  mkdir -p $1
+  find . -type d -exec mkdir -p $1/{} \;
+  find .			\
+      \(			\
+        -iname '*.tedit' 	\
+        -o			\
+	-iname '*.ted'		\
+        -o			\
+	-iname '*.pdf'		\
+        -o			\
+	-iname '*.txt'		\
+      \)			\
+      -exec cp -p {} $1/{} \;	\
+  ;
 }
 
 copy_sources () {
   mkdir -p $1
   find . -type d -exec mkdir -p $1/{} \;
-  find . ! -iname '*~*~' ! -iname '*.lcom' ! -iname '*.dfasl' ! -type d -exec cp -p {} $1/{} \;
+  find .			\
+      ! -iname '*~*~' 		\
+      ! -iname '*.lcom'		\
+      ! -iname '*.dfasl'	\
+      ! -iname '*.tedit'	\
+      ! -iname '*.ted'		\
+      ! -iname '*.pdf'		\
+      ! -iname '*.txt'		\
+      ! -type d			\
+      -exec cp -p {} $1/{} \;	\
+  ;
 }
 
 TMP_DIR=/tmp/tmp-$$
@@ -138,15 +172,31 @@ TMP_DIR=/tmp/tmp-$$
 #
 MEDLEYFS_LCOMS=${TMP_DIR}/lcoms/medleyfs
 MEDLEYFS_SOURCES=${TMP_DIR}/sources/medleyfs
-MEDLEYFS_DIRS="greetfiles internal sources library lispusers"
+MEDLEYFS_DOCS=${TMP_DIR}/docs/medleyfs
 mkdir -p ${MEDLEYFS_LCOMS}
 mkdir -p ${MEDLEYFS_SOURCES}
+mkdir -p ${MEDLEYFS_DOCS}
+
+MEDLEYFS_DIRS="greetfiles internal sources library lispusers doctools"
+
 for dir in ${MEDLEYFS_DIRS}
 do
   cd "${MEDLEYDIR}"/${dir}
   copy_lcoms ${MEDLEYFS_LCOMS}/${dir}
+  copy_docs ${MEDLEYFS_DOCS}/${dir}
   copy_sources ${MEDLEYFS_SOURCES}/${dir}
 done
+
+cp -rp "${MEDLEYDIR}"/docs ${MEDLEYFS_DOCS}
+mkdir -p ${MEDLEYFS_LCOMS}/docs
+mv ${MEDLEYFS_DOCS}/docs/dinfo ${MEDLEYFS_LCOMS}/docs
+
+cp -rp "${MEDLEYDIR}"/fonts ${MEDLEYFS_LCOMS}
+cp -rp "${MEDLEYDIR}"/unicode ${MEDLEYFS_LCOMS}
+
+mkdir -p ${MEDLEYFS_SOURCES}/loadups
+cp -rp "${MEDLEYDIR}"/loadups/whereis.hash ${MEDLEYFS_SOURCES}/loadups/whereis.hash
+
 #
 # for apps fs
 #
@@ -154,13 +204,16 @@ if [ -z "${NOAPPS}" ]
 then
     APPSFS_LCOMS=${TMP_DIR}/lcoms/appsfs
     APPSFS_SOURCES=${TMP_DIR}/sources/appsfs
+    APPSFS_DOCS=${TMP_DIR}/docs/appsfs
     mkdir -p ${APPSFS_LCOMS}
     mkdir -p ${APPSFS_SOURCES}
     cd "${MEDLEYDIR}"/rooms
     copy_lcoms ${APPSFS_LCOMS}/rooms
+    copy_docs ${APPSFS_DOCS}/rooms
     copy_sources ${APPSFS_SOURCES}/rooms
     cd ${NCDIR}
     copy_lcoms ${APPSFS_LCOMS}/notecards
+    copy_docs ${APPSFS_DOCS}/notecards
     copy_sources ${APPSFS_SOURCES}/notecards
     mv ${APPSFS_SOURCES}/notecards/notefiles ${APPSFS_LCOMS}/notecards
 fi
@@ -172,10 +225,6 @@ ${EM_TOOLSDIR}/file_packager							\
     build/medleyfs_lcoms.data 							\
     --js-output=build/medleyfs_lcoms.js 					\
     --preload 									\
-	"${MEDLEYDIR}"/fonts/@medley/fonts					\
-	"${MEDLEYDIR}"/unicode/@medley/unicode					\
-	"${MEDLEYDIR}"/doctools/@medley/doctools 				\
-	"${MEDLEYDIR}"/docs/@medley/docs 					\
 	"${MEDLEYFS_LCOMS}"@medley						\
     --no-node									\
     --no-force 									\
@@ -188,8 +237,19 @@ ${EM_TOOLSDIR}/file_packager							\
     build/medleyfs_sources.data 						\
     --js-output=build/medleyfs_sources.js 					\
     --preload 									\
-        "${MEDLEYDIR}"/loadups/whereis.hash@medley/loadups/whereis.hash 	\
 	"${MEDLEYFS_SOURCES}"@medley						\
+    --no-node									\
+    --no-force 									\
+    --lz4 									\
+    --use-preload-cache 							\
+    --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
+    2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
+
+${EM_TOOLSDIR}/file_packager							\
+    build/medleyfs_docs.data 						\
+    --js-output=build/medleyfs_docs.js 					\
+    --preload 									\
+	"${MEDLEYFS_DOCS}"@medley						\
     --no-node									\
     --no-force 									\
     --lz4 									\
@@ -265,6 +325,19 @@ then
       --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
       2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
 
+  ${EM_TOOLSDIR}/file_packager							\
+      build/appsfs_docs.data							\
+      --js-output=build/appsfs_docs.js					\
+      --preload 								\
+          "${APPSFS_DOCS}"/rooms@medley/rooms		 		\
+          "${APPSFS_DOCS}"/notecards@notecards				\
+      --no-node									\
+      --no-force								\
+      --lz4 									\
+      --use-preload-cache 							\
+      --indexedDB-name=MEDLEY_PRELOAD_CACHE					\
+      2>&1 | grep -v FORCE_FILESYSTEM | grep -v compress
+
 fi
 #
 #   Add medley.html to the build subdirs
@@ -288,5 +361,6 @@ tar -c -z -f "${SCRIPTDIR}"/tar/medley-full-emscripten.tgz *
 #
 #  Done
 #
+rm -rf "${TMP_DIR}"
 echo "Done with Medley emscripten build"
 exit 0
