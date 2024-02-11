@@ -178,6 +178,7 @@ jobs:
           echo "maiko_tag=${tag}" >> ${GITHUB_OUTPUT}
         env:
           GITHUB_TOKEN: ${{ secrets.MAIKO_TOKEN }}
+
       # Setup environment variables & establish job outputs
       - name: Setup Environment Variables
         run: |
@@ -276,12 +277,13 @@ jobs:
           if-no-files-found: error
 
 
-# JOB: linux_installer ##############################################################
+
+# JOB: emscripten_installer ##############################################################
 
   #
-  # Create the linux installers (.deb and .tgz) and push to release on github
+  # Create the a tar file of the emscripten files for deplaoyment 
   #
-  linux_installer:
+  emscripten_installer:
 
     runs-on: ubuntu-latest
 
@@ -292,127 +294,48 @@ jobs:
 
     steps:
 
-      # Checkout latest commit
-      - name: Checkout Medley
-        uses: actions/checkout@v4
-
       # Environment variables
       - name: Environment variables
         run: |
-          echo "DEBS_DIR=installers/deb/debs" >>${GITHUB_ENV}
-          echo "TARS_DIR=installers/deb/tars" >>${GITHUB_ENV}
-          echo "TARBALL_DIR=installers/deb/tmp/tarballs" >>${GITHUB_ENV}
-          echo "MEDLEY_RELEASE_TAG=${{ needs.loadup.outputs.medley_release_tag }}" \
-                >>${GITHUB_ENV}
-          echo "ARTIFACTS_FILENAME_TEMPLATE=${{ needs.loadup.outputs.artifacts_filename_template }}" >>${GITHUB_ENV}
-
-      # Create taball dir
-      - run: mkdir -p ${TARBALL_DIR}
-
-      #  Get the tarballs
-      - name: Get tarballs
-        uses: actions/download-artifact@v4
-        with:
-          name: tarballs
-          path: ${{ env.TARBALL_DIR }}
-
-      # Build the deb files as well as the tgz files
-      - name: Build .deb files for 3 architectures
-        id: debs
-        run: |
-          cd installers/deb
-          ./build_deb.sh
-
-      # Push the debs and tgz up to github releases
-      - name: Push the release
-        id: push_release
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          artifacts:
-            ${{ env.DEBS_DIR }}/*.deb,
-            ${{ env.TARS_DIR }}/*.tgz
-          tag: ${{ env.MEDLEY_RELEASE_TAG }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          omitBodyDuringUpdate: true
-          omitDraftDuringUpdate: true
-          omitNameDuringUpdate: true
-          omitPrereleaseDuringUpdate: true
-
-      - name: Rename medley tar for the x86_64 platform
-        run: |
-            cd ${{ env.TARS_DIR }}
-            mv  medley-full-linux-x86_64-*.tgz medley.tgz
-
-      - name: Save medley tar for use in cygwin installers
-        uses: actions/upload-artifact@v4
-        with:
-          name: medley-tar
-          path: |
-            ${{ env.TARS_DIR }}/medley.tgz
-
-
-# JOB: macos_installer ##############################################################
-
-  #
-  # Create the macos installers (.dmg and .zip) and push to release on github
-  #
-  macos_installer:
-
-    runs-on: macos-12
-
-    needs: [inputs, sentry, loadup]
-    if: |
-      needs.sentry.outputs.release_not_built == 'true'
-      || needs.inputs.outputs.force == 'true'
-#    if: false
-
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-
-      # Checkout latest commit
-      - name: Checkout Medley
-        uses: actions/checkout@v4
-
-      # Environment variables
-      - name: Environment variables
-        run: |
-          MACOS_DIR=installers/macos
-          echo "MACOS_DIR=${MACOS_DIR}" >>${GITHUB_ENV}
-          echo "ARTIFACTS_DIR=${MACOS_DIR}/artifacts" >>${GITHUB_ENV}
-          echo "TARBALL_DIR=${MACOS_DIR}/tmp/tarballs" >>${GITHUB_ENV}
+          echo "IL_DIR=/tmp/il" >>${GITHUB_ENV}
           echo "MEDLEY_RELEASE_TAG=${{ needs.loadup.outputs.medley_release_tag }}" >>${GITHUB_ENV}
-          echo "ARTIFACTS_FILENAME_TEMPLATE=${{ needs.loadup.outputs.artifacts_filename_template }}" >>${GITHUB_ENV}
+          echo "COMBINED_RELEASE_TAG=${{ needs.loadup.outputs.combined_release_tag }}" >>${GITHUB_ENV}
 
-      # Create tarball dir
-      - run: mkdir -p ${TARBALL_DIR}
+      # Create working directory
+      - run: mkdir -p ${IL_DIR}
 
       #  Get the tarballs
       - name: Get tarballs
         uses: actions/download-artifact@v4
         with:
           name: tarballs
-          path: ${{ env.TARBALL_DIR }}
+          path: ${{ env.IL_DIR }}
 
-      # Build the .dmg and .zip files
-      - name: Build .dmg & .zip files
-        id: dmg-zip
-        run: |
-          cd ${MACOS_DIR}
-          ./build_artifacts.sh
+      #  Untar the tarballs
+      - name: Untar tarballs
+      - run: |
+          cd ${IL_DIR}
+          tar -x -z -f *-loadups.tgz
+          tar -x -z -f *-runtime.tgz
+          tar -x -z -C maiko/emacripten.wasm_nl -f maiko*emscripten.tgz
+          tar -x -z -f notecards.tgz
 
-      # Push the .dmg and .zip up to github releases
+      # Build the emscripten files
+      - name: Build emscripten files
+      - run: |
+          cd ${IL_DIR}/medley/installers/emcripten
+          ./em_build.sh
+          cd tar
+          mv medley-full-emscripten.tgz medley-full-emscripten-${COMBINED_RELEASE_TAG}.tgz
+
+      # Push the emscripten tgz up to github releases
       - name: Push the release
         id: push_release
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
           artifacts:
-            # 2023-07-20 not yet building dmg -- ${{ env.ARTIFACTS_DIR }}/*.dmg,
-            ${{ env.ARTIFACTS_DIR }}/*.zip
+            ${{ env.IL_DIR }}/medley/installers/emscripten/tar/*.tgz
           tag: ${{ env.MEDLEY_RELEASE_TAG }}
           token: ${{ secrets.GITHUB_TOKEN }}
           omitBodyDuringUpdate: true
@@ -421,208 +344,6 @@ jobs:
           omitPrereleaseDuringUpdate: true
 
 
-
-# JOB: cygwin_installer #############################################################
-
-  #
-  # Create the Windows installer, push it up to the release on github and
-  # update the downloads page on OIO
-  #
-  cygwin_installer:
-
-    runs-on: windows-2022
-
-    needs: [inputs, sentry, loadup, linux_installer]
-    if: |
-      needs.sentry.outputs.release_not_built == 'true'
-      || needs.inputs.outputs.force == 'true'
-
-    outputs:
-      cygwin_installer: ${{ steps.compile_iss.outputs.CYGWIN_INSTALLER }}
-
-    steps:
-
-      # Checkout latest commit
-      - name: Checkout Medley
-        uses: actions/checkout@v4
-
-      # Store the values output from loadup job as environment variables
-      - name: Environment Variables
-        shell: powershell
-        run: |
-          $crt="${{ needs.loadup.outputs.combined_release_tag }}"
-          echo "COMBINED_RELEASE_TAG=$crt" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          $mrt="${{ needs.loadup.outputs.medley_release_tag }}"
-          echo "MEDLEY_RELEASE_TAG=$mrt" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          $msrt="${{ needs.loadup.outputs.medley_short_release_tag }}"
-          echo "MEDLEY_SHORT_RELEASE_TAG=$msrt" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          $aft="${{ needs.loadup.outputs.artifacts_filename_template }}"
-          echo "ARTIFACTS_FILENAME_TEMPLATE=$aft" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          $debs="${{ needs.loadup.outputs.debs_filename_base }}"
-          echo "DEBS_FILENAME_BASE=$debs" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-
-      # Retrieve medley tars from artifact store
-      - name: Retrieve medley tar
-        uses: actions/download-artifact@v4
-        with:
-          name: medley-tar
-          path: installers/cygwin/
-
-      # Download maiko cygwin build
-      - name: Retrieve maiko cygwin build
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ secrets.MAIKO_TOKEN }}
-        run: |
-          gh release download ${{ needs.loadup.outputs.maiko_release_tag }} --repo interlisp/maiko --pattern ${{ needs.loadup.outputs.maiko_release_tag }}-cygwin.x86_64.tgz --output installers\cygwin\maiko-cygwin.x86_64.tgz
-
-      # Download cygwin installer to be included by medley.iss
-      - name: Download cygwin installer
-        id: cygwin
-        shell: powershell
-        run: |
-          wget https://cygwin.com/setup-x86_64.exe -OutFile installers\cygwin\setup-x86_64.exe
-
-      # Download vnc viewer
-      #- name: Download vncviewer
-      #  shell: powershell
-      #  run: |
-      #    $url = "https://sourceforge.net/projects/tigervnc/files/stable/1.12.0/vncviewer64-1.12.0.exe"
-      #    $output = "installers\win\vncviewer64-1.12.0.exe"
-      #    (New-Object System.Net.WebClient).DownloadFile($url, $output)
-
-      # Run iscc.exe to compile the installer
-      #- name: Compile medley.iss
-      #  shell: powershell
-      #  run: |
-      #     iscc installers\win\medley.iss
-      #     $filename="medley-install_${env:COMBINED_RELEASE_TAG}_x64.exe"
-      #     echo "INSTALLER_FILENAME=$filename" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-
-      # Run iscc.exe to compile the installer
-      - name: Compile cygwin_medley.iss
-        id: compile_iss
-        shell: powershell
-        run: |
-           $Env:CYGWIN_INSTALLER_BASE="medley-full-cygwin-x86_64-${env:COMBINED_RELEASE_TAG}"
-           $CYGWIN_INSTALLER="${Env:CYGWIN_INSTALLER_BASE}.exe"
-           echo "CYGWIN_INSTALLER=$CYGWIN_INSTALLER" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-           echo "CYGWIN_INSTALLER=$CYGWIN_INSTALLER" | Out-File -FilePath $Env:GITHUB_OUTPUT -Encoding utf8 -Append
-           iscc installers\cygwin\medley.iss
-
-      # Upload windows installer to release
-      - name: Upload windows installer to release
-        id: push
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          artifacts: installers/cygwin/${{ env.CYGWIN_INSTALLER }}
-          tag: ${{ env.MEDLEY_RELEASE_TAG }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          omitBodyDuringUpdate: true
-          omitDraftDuringUpdate: true
-          omitNameDuringUpdate: true
-          omitPrereleaseDuringUpdate: true
-
-
-# JOB: downloads_page ################################################################
-
-  #
-  # Update the downloads page on OIO
-  #
-
-  downloads_page:
-
-    runs-on: ubuntu-latest
-
-    needs: [inputs, sentry, loadup, linux_installer, macos_installer, cygwin_installer]
-    if: |
-      needs.sentry.outputs.release_not_built == 'true'
-      || needs.inputs.outputs.force == 'true'
-
-    steps:
-
-      # Environment variables
-      - name: Environment Varibales (from other jobs)
-        run: |
-          crt="${{ needs.loadup.outputs.combined_release_tag }}"
-          echo "COMBINED_RELEASE_TAG=${crt}" >>${GITHUB_ENV}
-          mrt="${{ needs.loadup.outputs.medley_release_tag }}"
-          echo "MEDLEY_RELEASE_TAG=${mrt}" >>${GITHUB_ENV}
-          msrt="${{ needs.loadup.outputs.medley_short_release_tag }}"
-          echo "MEDLEY_SHORT_RELEASE_TAG=${msrt}" >>${GITHUB_ENV}
-          cyginst="${{ needs.cygwin_installer.outputs.cygwin_installer }}"
-          echo "CYGWIN_INSTALLER=${cyginst}" >>${GITHUB_ENV}
-
-      # Checkout latest commit
-      - name: Checkout Medley
-        uses: actions/checkout@v4
-
-
-      # Upload a dummy file to release
-      # Needed since download url of the release changes on every update
-      # So this will be the final update before creating downloads page
-      # and we can use its url for the page
-      - run: echo "placeholder" >placeholder.txt
-      - name: Upload windows placeholder.txt to release
-        id: pushph
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          artifacts: placeholder.txt
-          tag: ${{ env.MEDLEY_RELEASE_TAG }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          omitBodyDuringUpdate: true
-          omitDraftDuringUpdate: true
-          omitNameDuringUpdate: true
-          omitPrereleaseDuringUpdate: true
-
-      # Update the downloads page and the man page on OIO
-      - name: Update the downloads page and the man page to the OIO static page host
-        shell: bash
-        run: |
-            # Figure out filenames
-            download_url="${{ steps.pushph.outputs.html_url }}"
-            download_url="${download_url/\/tag\//\/download\/}"
-            local_template="installers/downloads_page/medley_downloads.html"
-            local_filename="medley_downloads.html"
-            local_manpath="docs/man-page/man_medley.html"
-            if [ "${{ needs.inputs.outputs.draft }}" = "true" ];
-            then
-                remote_filename="draft_downloads"
-                remote_manname="man_draft.html"
-            else
-                remote_filename="${local_filename%.html}"
-                remote_manname="man_medley.html"
-            fi
-            remote_filepath="/srv/oio/static/${remote_filename}"
-            remote_manpath="/srv/oio/static/${remote_manname}"
-            # Fill in downloads page template
-            sed \
-               -e "s/@@@MEDLEY.SHORT.RELEASE.TAG@@@/${MEDLEY_SHORT_RELEASE_TAG}/g" \
-               -e "s/@@@COMBINED.RELEASE.TAG@@@/${COMBINED_RELEASE_TAG}/g" \
-               -e "s~@@@DOWNLOAD_URL@@@~${download_url}~g" \
-               -e "s~@@@CYGWIN.INSTALLER@@@~${CYGWIN_INSTALLER}~g" \
-               < "${local_template}" > "${local_filename}"
-            # Create sftp instruction file
-            echo "-rm ${remote_filepath}.oldold" > batch
-            echo "-rename ${remote_filepath}.old ${remote_filepath}.oldold" >> batch
-            echo "-rename ${remote_filepath}.html ${remote_filepath}.old" >> batch
-            echo "-put ${local_filename} ${remote_filepath}.html" >> batch
-            echo "-put ${local_manpath} ${remote_manpath}" >> batch
-            # Do the sftp
-            eval $(ssh-agent)
-            ssh-add - <<< "${SSH_KEY}"
-            sftp -o StrictHostKeyChecking=no -b batch ubuntu@online.interlisp.org
-        env:
-            SSH_KEY: ${{ secrets.OIO_SSH_KEY }}
-
-      # Remove placeholder.txt
-      - name: Remove placeholder.txt
-        run: |
-          gh release delete-asset ${{ env.MEDLEY_RELEASE_TAG }} placeholder.txt --yes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
 # JOB: complete #####################################################################
@@ -637,7 +358,7 @@ jobs:
     outputs:
       build_successful: ${{ steps.output.outputs.build_successful }}
 
-    needs: [inputs, sentry, loadup, downloads_page]
+    needs: [inputs, sentry, loadup, emscripten]
 
     steps:
       # Delete the tarballs artifact
