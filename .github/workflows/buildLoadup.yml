@@ -373,7 +373,7 @@ jobs:
     outputs:
       build_successful: ${{ steps.output.outputs.build_successful }}
 
-    needs: [inputs, sentry, loadup, emscripten]
+    needs: [inputs, sentry, loadup, emscripten_installer]
 
     steps:
       # Delete the tarballs artifact
