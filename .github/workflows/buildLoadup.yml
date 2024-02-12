@@ -370,7 +370,7 @@ jobs:
       - name: Push to emscripten web server
         run: |
             # Create sftp instruction file
-            remote_dir="/opt/bitnami/ngnix"
+            remote_dir="/opt/bitnami/nginx"
             echo "-cd ${remote_dir}/html.oldold" > batch
             echo '-rm *' >>batch
             echo "-cd ${remote_dir}" >>batch
@@ -379,7 +379,7 @@ jobs:
             echo "-rename html html.old" >> batch
             echo "-mkdir html" >> batch
             echo "-cd html" >> batch
-            echo "-lcd ${IL_DIR}/medley/installers/emscripten" >> batch
+            echo "-lcd ${IL_DIR}/medley/installers/emscripten/build" >> batch
             echo '-put *' >> batch
             # Do the sftp
             eval $(ssh-agent)
