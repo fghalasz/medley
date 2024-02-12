@@ -340,6 +340,19 @@ then
 
 fi
 #
+#  Add Maiko to the build subdirs
+#
+cd "${SCRIPTDIR}"
+cp -p "${MAIKODIR}"/emscripten.wasm_nl/* build
+#
+#  Gzip all of the file so far
+#
+cd "${SCRIPTDIR}"/build
+for file in *
+do
+   gzip --best -c "${file}" >"${file}.gz"
+done
+#
 #   Add medley.html to the build subdirs
 #
 cd "${SCRIPTDIR}"
@@ -348,11 +361,6 @@ if [ -n "${NOAPPS}" ]
 then
   sed -i -e 's/params.has("apps")/false/' build/medley.html
 fi
-#
-#  Add Maiko to the build subdirs
-#
-cd "${SCRIPTDIR}"
-cp -p "${MAIKODIR}"/emscripten.wasm_nl/* build
 #
 #  Create a tar of the build directory's contents
 #

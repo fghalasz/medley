@@ -166,13 +166,10 @@ jobs:
           if [ "${{ needs.inputs.outputs.draft }}" = "true" ];
           then
             gh release list --repo ${{ github.repository_owner }}/maiko > /tmp/releases-$$
-            set +e
-            grep Draft </tmp/releases-$$ >/tmp/draft-releases-$$
-            if [ $? -eq 0 ];
+            if grep Draft </tmp/releases-$$ >/tmp/draft-releases-$$;
             then
               tag=$(head -n 1 /tmp/draft-releases-$$ | awk '{ print $3 }')
             fi
-            set -e
           fi
           if [ -z "${tag}" ];
           then
