@@ -162,14 +162,14 @@ jobs:
       - name: Get maiko release information
         id: maiko
         run: |
-          set -x
           tag=""
           if [ "${{ needs.inputs.outputs.draft }}" = "true" ];
           then
-            gh release list --repo ${{ github.repository_owner }}/maiko | grep Draft >/tmp/releases-$$
+            gh release list --repo ${{ github.repository_owner }}/maiko > /tmp/releases-$$
+            grep Draft </tmp/releases-$$ >/tmp/draft-releases-$$
             if [ $? -eq 0 ];
             then
-              tag=$(head -n 1 /tmp/releases-$$ | awk '{ print $3 }')
+              tag=$(head -n 1 /tmp/draft-releases-$$ | awk '{ print $3 }')
             fi
           fi
           if [ -z "${tag}" ];
