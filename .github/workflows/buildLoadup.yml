@@ -366,7 +366,27 @@ jobs:
           omitNameDuringUpdate: true
           omitPrereleaseDuringUpdate: true
 
-
+      # Push the files to the emscripten web server
+      - name: Push to emscripten web server
+        run: |
+            # Create sftp instruction file
+            remote_dir="/opt/bitnami/ngnix"
+            echo "-cd ${remote_dir}/html.oldold" > batch
+            echo '-rm *' >batch
+            echo "-cd ${remote_dir}"
+            echo "-rmdir html.oldold" > batch
+            echo "-rename html.old html.oldold" >> batch
+            echo "-rename html html.old" >> batch
+            echo "-mkdir html"
+            echo "-cd html"
+            echo "-lcd ${IL_DIR}/medley/installers/emscripten"
+            echo '-put *' >> batch
+            # Do the sftp
+            eval $(ssh-agent)
+            ssh-add - <<< "${SSH_KEY}"
+            sftp -o StrictHostKeyChecking=no -b batch bitnami@54.213.29.181
+        env:
+            SSH_KEY: ${{ secrets.NGNIX_EMSCRIPTEN_SSH_KEY }}
 
 
 # JOB: complete #####################################################################
