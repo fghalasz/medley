@@ -162,6 +162,7 @@ jobs:
       - name: Get maiko release information
         id: maiko
         run: |
+          set -x
           tag=""
           if [ "${{ needs.inputs.outputs.draft }}" = "true" ];
           then
