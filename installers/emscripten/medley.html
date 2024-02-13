@@ -42,6 +42,7 @@
             Module = 
 		{
                   preRun: [ function() {ENV.MEDLEYDIR = "{DSK}<medley>"; }],
+                  onExit: function() { document.getElementById('canvas').remove(); },
                   arguments: ["medley/loadups/"+sysout+".sysout","-sc", width+"x"+height, "-nh-host", "127.0.0.1"],
                   canvas: (function() { return document.getElementById('canvas'); })()
                 };
