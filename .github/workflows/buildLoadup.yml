@@ -340,8 +340,8 @@ jobs:
           tar -x -z -f *-runtime.tgz
           tar -x -z -f notecards.tgz
           tar -x -z -f installers.tgz
-          mkdir -p maiko/emscripten.wasm_nl
-          tar -x -z -C maiko/emscripten.wasm_nl -f maiko*emscripten.tgz
+          mkdir -p maiko/emscripten.wasm
+          tar -x -z -C maiko/emscripten.wasm -f maiko*emscripten.tgz
 
       # Build the emscripten files
       - name: Build emscripten files
