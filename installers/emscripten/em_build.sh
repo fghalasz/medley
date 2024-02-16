@@ -93,9 +93,9 @@ else
   echo "Exiting"
   exit 11
 fi
-if [ ! -d "${MAIKODIR}/emscripten.wasm_nl" ]
+if [ ! -d "${MAIKODIR}/emscripten.wasm" ]
 then
-  echo "Error: empscripten.wasm_nl directory missing from ${MAIKODIR}"
+  echo "Error: empscripten.wasm directory missing from ${MAIKODIR}"
   echo "Exiting"
   exit 12
 fi
@@ -343,7 +343,7 @@ fi
 #  Add Maiko to the build subdirs
 #
 cd "${SCRIPTDIR}"
-cp -p "${MAIKODIR}"/emscripten.wasm_nl/* build
+cp -p "${MAIKODIR}"/emscripten.wasm/* build
 #
 #  Gzip all of the file so far
 #
