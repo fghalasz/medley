@@ -7,6 +7,10 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   </head>
   <body>
+    <div id="load_init_div" style="text-align: center;">
+      <label for="load_init_button" style="color: white">Import personal INIT file: </label>
+      <input type="file" id="load_init_button" name="load_init_button" onchange="load_init_file()" style="color: white">
+    </div>
     <div style="text-align: center;">
       <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     </div>
@@ -14,39 +18,102 @@
 
          window.addEventListener("load",function() { document.body.style.backgroundColor = '#2D7D9A'; });
 
-         var Module;
+         var Module = {};
+
+         let init_reader = new FileReader();
+
+         function load_init_file() {
+             let files = document.getElementById("load_init_button").files;
+             let file = files[0];
+             init_reader.addEventListener('loadend', save_init_file);
+             init_reader.readAsArrayBuffer(file);
+         }
+
+         function save_init_file() {
+             let result = init_reader.result;
+             const uint8_view = new Uint8Array(result);
+             FS.writeFile("/home/medley/INIT", uint8_view);
+         } 
 
          (function() {
+            const canvas = document.getElementById("canvas");
             const width = 32*Math.trunc(Math.min(Math.max(window.innerWidth, 512), 1664)/32);
-            const height = Math.min(Math.max(window.innerHeight, 512), 1260);
+            const height = Math.min(Math.max(window.innerHeight - 35, 512), 1260);
+            canvas.height = height;
+
             const params = new URLSearchParams(window.location.search);
+            let sysout = "vmem";
+            if (params.has("lisp") || params.has("l")) sysout = "lisp";
+            if (params.has("full") || params.has("f")) sysout = "full";
+            if (params.has("apps") || params.has("a")) sysout = "apps";
+            if (params.has("continue") || params.has("cont") || params.has("c")) sysout = "vmem";
+            const sysout_path = 
+                (sysout == "vmem")
+                ? "medley/loadups/" + "full" + ".sysout"
+                : "medley/loadups/" + sysout + ".sysout"
+                ;
+            const sysout_fs =
+                (sysout == "vmem")
+                ? "full"
+                : sysout
+                ; 
 
-            let sysout = "full";
-            if (params.has("lisp")) sysout = "lisp";
-            if (params.has("full")) sysout = "full";
-            if (params.has("apps")) sysout = "apps";
-
-            let include_sources = false;
+            let include_sources = false;      
             if (params.has("source") || params.has("sources")) include_sources=true;
 
             document.write('<script src="medleyfs_lcoms.js"><\/script>');
             document.write('<script src="medleyfs_docs.js"><\/script>');
             if (include_sources) document.write('<script src="medleyfs_sources.js"><\/script>');
          
-            document.write('<script src="' + sysout + '_sysout.js"><\/script>');
+            document.write('<script src="' + sysout_fs + '_sysout.js"><\/script>');
+
             if (sysout == "apps") { 
               document.write('<script src="appsfs_lcoms.js"><\/script>');
               document.write('<script src="appsfs_docs.js"><\/script>');
               if (include_sources) document.write('<script src="appsfs_sources.js"><\/script>');
             }
-            Module = 
-		{
-                  preRun: [ function() {ENV.MEDLEYDIR = "{DSK}<medley>"; }],
-                  onExit: function() { document.getElementById('canvas').remove(); },
-                  arguments: ["medley/loadups/"+sysout+".sysout","-sc", width+"x"+height, "-nh-host", "127.0.0.1"],
-                  canvas: (function() { return document.getElementById('canvas'); })()
+        
+            Module.preRun =
+                [
+                  function() { 
+                      ENV.USER = ENV.LOGNAME= "medley";
+                      ENV.HOME = "/home/medley";
+                      ENV.MEDLEYDIR = "{DSK}<medley>"; 
+                      const vmem_path = ENV.HOME + "/lisp.virtualmem";
+                      ENV.LDEDESTSYSOUT = vmem_path;
+                      if(sysout == "apps") ENV.MEDLEY_EXEC = "inter";
+                      ENV.MEDLEY_EMSCRIPTEN = "true";
+
+                      FS.rmdir('/home/web_user');
+                      FS.mkdir('/home/medley'); 
+                      FS.mount(IDBFS, {}, '/home/medley');
+                      FS.syncfs(true, (err) => {
+                          if(err) console.log("Oh my ######### " + err);
+                          else {
+                             if ((sysout == "vmem") &&
+                                 (FS.analyzePath(ENV.LDEDESTSYSOUT, false)["exists"]))
+                                      ENV.LDESRCESYSOUT = vmem_path;
+                             else ENV.LDESRCESYSOUT = sysout_path;
+                          }
+                      });
+                   }
+                ];
+
+            Module.onExit =
+                function() { 
+                    FS.syncfs(false, function (err) {
+                           if (err) console.log("Oh my %%%%%" + err);
+                    });
+                    document.getElementById("load_init_div").hidden = true;
+                    canvas.remove();
                 };
-          })();
+
+            Module.arguments =
+                [ "-sc", width+"x"+height ];
+            
+            Module.canvas = canvas;
+
+         })();
     </script>
     <script src="ldesdl.js"></script>
   </body>
